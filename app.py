@@ -65,10 +65,22 @@ columna_nombre = (
     col_nombre_candidatas[0] if col_nombre_candidatas else df_raw.columns[3]
 )
 
-# --- LIMPIEZA Y UNIFICACIÓN DE NOMBRES (EVITA DUPLICADOS POR ESPACIOS O MAYÚSCULAS) ---
-df_raw[columna_nombre] = (
-    df_raw[columna_nombre].astype(str).str.strip().str.title()
-)
+
+# --- UNIFICACIÓN BLINDADA DE NOMBRES (ELIMINA DUPLICADOS DE ADRIÁN) ---
+def armonizar_nombres(nombre):
+  n = str(nombre).strip().title()
+  n_norm = "".join(
+      c
+      for c in unicodedata.normalize("NFD", n)
+      if unicodedata.category(c) != "Mn"
+  ).lower()
+  # Fusiona cualquier variante de Adrián Mosquera en una sola
+  if "adrian mosquera" in n_norm:
+    return "Adrian Mosquera Renteria"
+  return n
+
+
+df_raw[columna_nombre] = df_raw[columna_nombre].apply(armonizar_nombres)
 
 lista_jugadores = sorted(df_raw[columna_nombre].dropna().unique())
 jugador_seleccionado = st.sidebar.selectbox(
@@ -92,7 +104,7 @@ def limpiar_texto(texto):
   )
 
 
-# --- BÚSQUEDA DE FOTO INTELIGENTE ---
+# --- BÚSQUEDA DE FOTO ---
 current_dir = os.getcwd()
 ruta_foto = None
 archivo_encontrado = None
@@ -245,7 +257,7 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR ---
+# --- DISEÑO INFERIOR (RADAR EXCLUSIVO CON LAS 8 MÉTRICAS SOLICITADAS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
@@ -254,25 +266,24 @@ with col_radar:
   cols_numericas = df_jugador.select_dtypes(
       include=["float64", "int64"]
   ).columns.tolist()
-  keywords_radar = ["load", "hsr", "dist", "sprint", "acc", "dec", "vel", "min"]
-  exclusiones = [
-      "id",
-      "fecha",
-      "partido",
-      "jornada",
-      "año",
-      "talla",
-      "peso",
-      "número",
-      "numero",
-  ]
 
+  # Lista estricta basada exclusivamente en tus métricas requeridas: pl, td, m_min, hsr, sprint25, acc, dec, maxvel
+  metricas_objetivo = [
+      "pl",
+      "td",
+      "m_min",
+      "hsr",
+      "sprint25",
+      "acc",
+      "dec",
+      "maxvel",
+  ]
   cols_radar = []
+
   for c in cols_numericas:
     c_lower = str(c).lower()
-    es_valida = any(k in c_lower for k in keywords_radar)
-    es_excluida = any(e in c_lower for e in exclusiones)
-    if es_valida and not es_excluida:
+    # Verifica si la columna coincide con alguna de las exactas solicitadas
+    if any(m in c_lower for m in metricas_objetivo):
       cols_radar.append(c)
 
   if len(cols_radar) >= 3 and not df_jugador.empty:
