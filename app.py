@@ -70,7 +70,7 @@ jugador_seleccionado = st.sidebar.selectbox(
     "Selecciona el Jugador:", lista_jugadores
 )
 
-# --- FILTRADO 100% ESTRICTO DE DATOS (EVITA MEZCLAR FILAS) ---
+# --- FILTRADO 100% ESTRICTO DE DATOS ---
 df_jugador = df_raw[df_raw[columna_nombre] == jugador_seleccionado]
 
 
@@ -82,13 +82,13 @@ def limpiar_texto(texto):
   ).lower()
 
 
-# --- BÚSQUEDA INTELIGENTE Y RECURSIVA DE FOTO ---
+# --- BÚSQUEDA INTELIGENTE POR PUNTUACIÓN DE COINCIDENCIA ---
 current_dir = os.getcwd()
 ruta_foto = None
 archivo_encontrado = None
 carpeta_fotos_real = None
+archivos_en_carpeta = []
 
-# Localiza la carpeta 'FOTOS' de manera universal (sin importar mayúsculas)
 for root, dirs, files in os.walk(current_dir):
   for d in dirs:
     if d.strip().lower() in ["fotos", "photo", "photos"]:
@@ -98,39 +98,39 @@ for root, dirs, files in os.walk(current_dir):
     break
 
 if carpeta_fotos_real:
-  archivos_fotos = [
+  archivos_en_carpeta = [
       f
       for f in os.listdir(carpeta_fotos_real)
       if not f.startswith(".")
       and f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
   ]
+
   nombre_limpio_jugador = limpiar_texto(jugador_seleccionado)
-  tokens_jugador = [p for p in nombre_limpio_jugador.split() if len(p) > 1]
+  tokens_jugador = set(
+      p for p in nombre_limpio_jugador.split() if len(p) > 2
+  )  # Ignora palabras cortas
 
   mejor_coincidencia = None
+  max_puntuacion = 0
 
-  for archivo in archivos_fotos:
+  for archivo in archivos_en_carpeta:
     nombre_sin_ext = os.path.splitext(archivo)[0]
-    nombre_limpio_archivo = limpiar_texto(nombre_sin_ext)
+    tokens_archivo = set(p for p in limpiar_texto(nombre_sin_ext).split() if len(p) > 2)
 
-    # 1. Coincidencia exacta
-    if nombre_limpio_archivo == nombre_limpio_jugador:
-      mejor_coincidencia = archivo
-      break
+    # Calcula cuántas palabras clave coinciden entre el Excel y el nombre del archivo de foto
+    coincidencias = tokens_jugador.intersection(tokens_archivo)
+    puntuacion = len(coincidencias)
 
-    # 2. Coincidencia parcial contenida
-    if (
-        nombre_limpio_archivo in nombre_limpio_jugador
-        or nombre_limpio_jugador in nombre_limpio_archivo
-    ):
-      mejor_coincidencia = archivo
+    # Si hay coincidencia exacta de cadena completa, le damos prioridad máxima
+    if limpiar_texto(nombre_sin_ext) == nombre_limpio_jugador:
+      puntuacion = 100
 
-    # 3. Coincidencia por palabras clave compartidas
-    tokens_archivo = [p for p in nombre_limpio_archivo.split() if len(p) > 1]
-    if any(t in tokens_archivo for t in tokens_jugador) and not mejor_coincidencia:
+    if puntuacion > max_puntuacion:
+      max_puntuacion = puntuacion
       mejor_coincidencia = archivo
 
-  if mejor_coincidencia:
+  # Umbral de aceptación: si comparte al menos una palabra clave significativa o puntuación alta
+  if mejor_coincidencia and max_puntuacion > 0:
     archivo_encontrado = mejor_coincidencia
     ruta_foto = os.path.join(carpeta_fotos_real, mejor_coincidencia)
 
@@ -192,9 +192,9 @@ with col_foto:
       unsafe_allow_html=True,
   )
   if archivo_encontrado:
-    st.caption(f"📁 Foto cargada: {archivo_encontrado}")
+    st.success(f"✅ Foto vinculada: {archivo_encontrado}")
   else:
-    st.caption("⚠️ Sin foto en carpeta FOTOS (usando genérica).")
+    st.warning("⚠️ Sin foto asignada (usando genérica).")
 
 with col_info:
   st.markdown(
@@ -219,7 +219,7 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR SEGURO + MÉTRICAS GPS) ---
+# --- DISEÑO INFERIOR (RADAR + MÉTRICAS GPS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
@@ -325,6 +325,14 @@ with col_gps:
       st.metric("Desaceleraciones (dec)", dec)
   else:
     st.warning("Sin datos GPS registrados.")
+
+st.markdown("---")
+with st.expander(
+    "🔍 Depuración: Ver archivos detectados en la carpeta FOTOS en GitHub"
+):
+  st.write(f"Carpeta FOTOS encontrada: {carpeta_fotos_real}")
+  st.write(f"Archivos físicos disponibles en GitHub: {archivos_encontrado}")
+  st.write("Listado completo en el repositorio:", archivos_en_carpeta)
 
 st.markdown("---")
 with st.expander("📋 Ver Historial Detallado de Registros (Todas las Fechas)"):
