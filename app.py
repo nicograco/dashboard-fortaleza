@@ -52,7 +52,29 @@ REGISTRO_HISTORIAL_LESIONES = {
     "Samuel Osorio": ["Tobillos (Esguinces recurrentes)"],
 }
 
-# Coordenadas anatómicas ampliadas para el "muñequito" corporal (Plano X, Y)
+
+def normalizar_texto_clinico(texto):
+  return (
+      "".join(
+          c
+          for c in unicodedata.normalize("NFD", str(texto))
+          if unicodedata.category(c) != "Mn"
+      )
+      .lower()
+      .strip()
+  )
+
+
+def obtener_historial_jugador(nombre_jugador):
+  nombre_busqueda = normalizar_texto_clinico(nombre_jugador)
+  for k, lesiones in REGISTRO_HISTORIAL_LESIONES.items():
+    k_norm = normalizar_texto_clinico(k)
+    if k_norm in nombre_busqueda or nombre_busqueda in k_norm:
+      return lesiones
+  return []
+
+
+# Coordenadas anatómicas para el "muñequito" corporal (Plano X, Y)
 MAPA_ANATOMICO_COORDS = {
     "Cabeza": {"x": 50, "y": 90, "grupo": "Superior"},
     "Hombro Der": {"x": 35, "y": 75, "grupo": "Tren Superior"},
@@ -102,11 +124,7 @@ columna_nombre = (
 # --- UNIFICACIÓN BLINDADA DE NOMBRES (ELIMINA DUPLICADOS) ---
 def armonizar_nombres(nombre):
   n = str(nombre).strip().title()
-  n_norm = "".join(
-      c
-      for c in unicodedata.normalize("NFD", n)
-      if unicodedata.category(c) != "Mn"
-  ).lower()
+  n_norm = normalizar_texto_clinico(n)
   if "adrian mosquera" in n_norm:
     return "Adrian Mosquera Renteria"
   return n
@@ -268,7 +286,7 @@ with col_foto:
 
   # --- GENERACIÓN DEL "MUÑEQUITO" / MAPA ANATÓMICO CLÍNICO ---
   st.markdown("##### 🩺 Mapa de Lesividad (Historial)")
-  historial_lesiones = REGISTRO_HISTORIAL_LESIONES.get(jugador_seleccionado, [])
+  historial_lesiones = obtener_historial_jugador(jugador_seleccionado)
 
   fig_body = go.Figure()
   x_sanos, y_sanos, text_sanos = [], [], []
@@ -277,8 +295,8 @@ with col_foto:
   for zona, coord in MAPA_ANATOMICO_COORDS.items():
     afectado = any(
         any(
-            term.lower() in les.lower()
-            for term in [zona.lower(), coord["grupo"].lower()]
+            term.lower() in normalizar_texto_clinico(les)
+            for term in [normalizar_texto_clinico(zona), normalizar_texto_clinico(coord["grupo"])]
         )
         for les in historial_lesiones
     )
