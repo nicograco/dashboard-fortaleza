@@ -1,7 +1,6 @@
 import os
 import unicodedata
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
 st.set_page_config(
@@ -62,10 +61,10 @@ jugador_seleccionado = st.sidebar.selectbox(
     "Selecciona el Jugador:", lista_jugadores
 )
 
-# --- FILTRADO 100% ESTRICTO DE DATOS (EVITA MEZCLAS) ---
+# --- FILTRADO 100% ESTRICTO DE DATOS ---
 df_jugador = df_raw[df_raw[columna_nombre] == jugador_seleccionado]
 
-# --- BÚSQUEDA ESTRICTA DE FOTO (EVITA CRUCES) ---
+# --- BÚSQUEDA INTELIGENTE Y SEGURA DE FOTO ---
 current_dir = os.getcwd()
 contenido_directorio = os.listdir(current_dir)
 
@@ -91,24 +90,27 @@ if carpeta_fotos_real:
       f for f in os.listdir(carpeta_fotos_real) if not f.startswith(".")
   ]
 
-  nombre_limpio = limpiar_texto(jugador_seleccionado)
-  partes_nombre = [p for p in nombre_limpio.split() if len(p) > 2]
+  # Palabras clave del jugador seleccionado en el Excel
+  tokens_jugador = set(
+      [p for p in limpiar_texto(jugador_seleccionado).split() if len(p) > 1]
+  )
 
   for archivo in archivos_fotos:
-    archivo_limpio = limpiar_texto(archivo)
-    if partes_nombre and all(
-        parte in archivo_limpio for parte in partes_nombre
-    ):
-      archivo_encontrado = archivo
-      break
+    nombre_archivo_sin_ext = os.path.splitext(archivo)[0]
+    tokens_archivo = set(
+        [p for p in limpiar_texto(nombre_archivo_sin_ext).split() if len(p) > 1]
+    )
 
-  if archivo_encontrado:
-    ruta_foto = os.path.join(carpeta_fotos_real, archivo_encontrado)
+    # Valida que las palabras de la foto correspondan al jugador sin mezclarse con otros
+    if tokens_archivo and tokens_archivo.issubset(tokens_jugador):
+      archivo_encontrado = archivo
+      ruta_foto = os.path.join(carpeta_fotos_real, archivo)
+      break
 
 if not ruta_foto or not os.path.exists(ruta_foto):
   ruta_foto = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80"
 
-# --- INTERFAZ VISUAL PRINCIPAL ---
+# --- INTERFAZ VISUAL LIMPIA ---
 st.markdown(
     f"""
     <div class="header-box">
@@ -124,59 +126,15 @@ col1, col2 = st.columns([1, 2.5])
 with col1:
   st.image(ruta_foto, use_container_width=True)
   st.markdown(f"### **{jugador_seleccionado}**")
-  if not archivo_encontrado:
-    st.info("Sin fotografía oficial registrada.")
+  if archivo_encontrado:
+    st.success(f"Foto oficial: {archivo_encontrado}")
   else:
-    st.success("Fotografía sincronizada.")
+    st.info("Sin fotografía oficial registrada.")
 
 with col2:
-  st.markdown("### **📊 Perfil de Rendimiento y Métricas**")
+  st.markdown("### **📊 Resumen de Rendimiento y Registros**")
 
   if not df_jugador.empty:
-    cols_numericas = df_jugador.select_dtypes(
-        include=["float64", "int64"]
-    ).columns.tolist()
-
-    # CORRECCIÓN DE LA COMA INVALIDA AQUÍ:
-    cols_radar = [
-        c
-        for c in cols_numericas
-        if not any(
-            x in str(c).lower() for x in ["id", "fecha", "partido", "jornada"]
-        )
-    ]
-
-    if len(cols_radar) >= 3:
-      valores_jugador = df_jugador[cols_radar].mean().tolist()
-      categorias = cols_radar
-
-      fig = go.Figure()
-      fig.add_trace(
-          go.Scatterpolar(
-              r=valores_jugador,
-              theta=categorias,
-              fill="toself",
-              name=jugador_seleccionado,
-              line_color="#B22222",
-              fillcolor="rgba(178, 34, 34, 0.4)",
-          )
-      )
-
-      fig.update_layout(
-          polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-          showlegend=False,
-          margin=dict(t=30, b=30, l=30, r=30),
-          height=350,
-      )
-
-      st.plotly_chart(fig, use_container_width=True)
-    else:
-      st.info(
-          "Se muestran las métricas detalladas en tabla (métricas numéricas"
-          " insuficientes para radar automático)."
-      )
-
-    st.markdown("#### **Historial de Registros Individuales**")
     st.dataframe(df_jugador, use_container_width=True)
   else:
     st.warning("No hay registros disponibles para este jugador.")
