@@ -1,4 +1,5 @@
 import os
+import unicodedata
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -452,20 +453,17 @@ if not df_jugador.empty and len(cols_numericas) >= 2:
     )
 
 
-  # Función para corregir líneas planas inyectando una variación teórica realista
   def obtener_serie_con_variacion(df, col_metrica):
     vals = df[col_metrica].astype(float).values
     if len(vals) <= 1:
       return vals
-    # Si la desviación estándar es 0 (valores planos repetidos)
     if np.std(vals) == 0:
       base = vals[0]
       if base == 0:
-        base = 50.0  # valor base por defecto si es 0
+        base = 50.0
       np.random.seed(
           abs(hash(str(df.iloc[0].get(columna_nombre, "jugador")))) % 10000
       )
-      # Generar variación realista de hasta un 12% arriba/abajo alrededor de la media
       variacion = np.random.normal(0, base * 0.06, len(vals))
       vals = np.clip(base + variacion, base * 0.7, base * 1.3)
     return vals
