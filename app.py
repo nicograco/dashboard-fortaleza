@@ -38,61 +38,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ==========================================
-# 🩺 PASAPORTE CLÍNICO E HISTORIAL DE LESIVIDAD
-# ==========================================
-REGISTRO_HISTORIAL_LESIONES = {
-    "Sebastian Herrera": ["Isquiotibial Derecho"],
-    "Cesar Lucumi": ["Aductor Derecho"],
-    "Jhon Tarazona": ["Esguince Rodilla Derecha"],
-    "Jofren Santiago": ["Isquiotibial Izquierdo"],
-    "Juan Jose Carreño": ["Tendinopatía Rodilla"],
-    "Armando Larranz": ["Isquiotibial Derecho", "Isquiotibial Izquierdo"],
-    "Nicolas Suarez": ["Isquiotibial Derecho"],
-    "Samuel Osorio": ["Tobillos (Esguinces recurrentes)"],
-}
-
-
-def normalizar_texto_clinico(texto):
-  return (
-      "".join(
-          c
-          for c in unicodedata.normalize("NFD", str(texto))
-          if unicodedata.category(c) != "Mn"
-      )
-      .lower()
-      .strip()
-  )
-
-
-def obtener_historial_jugador(nombre_jugador):
-  nombre_busqueda = normalizar_texto_clinico(nombre_jugador)
-  for k, lesiones in REGISTRO_HISTORIAL_LESIONES.items():
-    k_norm = normalizar_texto_clinico(k)
-    if k_norm in nombre_busqueda or nombre_busqueda in k_norm:
-      return lesiones
-  return []
-
-
-# Coordenadas anatómicas para el "muñequito" corporal (Plano X, Y)
-MAPA_ANATOMICO_COORDS = {
-    "Cabeza": {"x": 50, "y": 90, "grupo": "Superior"},
-    "Hombro Der": {"x": 35, "y": 75, "grupo": "Tren Superior"},
-    "Hombro Izq": {"x": 65, "y": 75, "grupo": "Tren Superior"},
-    "Aductor Der": {"x": 46, "y": 52, "grupo": "Aductor"},
-    "Aductor Izq": {"x": 54, "y": 52, "grupo": "Aductor"},
-    "Cuádriceps Der": {"x": 42, "y": 45, "grupo": "Cuádriceps"},
-    "Cuádriceps Izq": {"x": 58, "y": 45, "grupo": "Cuádriceps"},
-    "Rodilla Der": {"x": 42, "y": 58, "grupo": "Rodilla"},
-    "Rodilla Izq": {"x": 58, "y": 58, "grupo": "Rodilla"},
-    "Isquiotibial Der": {"x": 42, "y": 30, "grupo": "Isquiotibial"},
-    "Isquiotibial Izq": {"x": 58, "y": 30, "grupo": "Isquiotibial"},
-    "Gemelo Der": {"x": 42, "y": 15, "grupo": "Gemelo"},
-    "Gemelo Izq": {"x": 58, "y": 15, "grupo": "Gemelo"},
-    "Tobillo Der": {"x": 42, "y": 5, "grupo": "Tobillo"},
-    "Tobillo Izq": {"x": 58, "y": 5, "grupo": "Tobillo"},
-}
-
 
 @st.cache_data
 def cargar_datos():
@@ -124,7 +69,11 @@ columna_nombre = (
 # --- UNIFICACIÓN BLINDADA DE NOMBRES (ELIMINA DUPLICADOS) ---
 def armonizar_nombres(nombre):
   n = str(nombre).strip().title()
-  n_norm = normalizar_texto_clinico(n)
+  n_norm = "".join(
+      c
+      for c in unicodedata.normalize("NFD", n)
+      if unicodedata.category(c) != "Mn"
+  ).lower()
   if "adrian mosquera" in n_norm:
     return "Adrian Mosquera Renteria"
   return n
@@ -261,7 +210,7 @@ goles = get_sum(["gol", "goles"])
 asistencias = get_sum(["asist"])
 autogoles = get_sum(["autogol"])
 
-# --- DISEÑO SUPERIOR (FOTO + DATOS + MUÑEQUITO CLÍNICO) ---
+# --- DISEÑO SUPERIOR (FOTO + DATOS PERSONALES Y ACUMULADOS) ---
 col_foto, col_info = st.columns([1, 2.3])
 
 with col_foto:
@@ -270,7 +219,7 @@ with col_foto:
   else:
     st.markdown(
         """
-        <div style="border: 2px dashed #ccc; border-radius: 8px; padding: 40px 20px; text-align: center; color: #666; background-color: #fff;">
+        <div style="border: 2px dashed #ccc; border-radius: 8px; padding: 60px 20px; text-align: center; color: #666; background-color: #fff;">
             <b>Sin fotografía oficial registrada</b>
         </div>
         """,
@@ -283,78 +232,6 @@ with col_foto:
   )
   if archivo_encontrado:
     st.caption(f"📁 Foto oficial: {archivo_encontrado}")
-
-  # --- GENERACIÓN DEL "MUÑEQUITO" / MAPA ANATÓMICO CLÍNICO ---
-  st.markdown("##### 🩺 Mapa de Lesividad (Historial)")
-  historial_lesiones = obtener_historial_jugador(jugador_seleccionado)
-
-  fig_body = go.Figure()
-  x_sanos, y_sanos, text_sanos = [], [], []
-  x_lesion, y_lesion, text_lesion = [], [], []
-
-  for zona, coord in MAPA_ANATOMICO_COORDS.items():
-    afectado = any(
-        any(
-            term.lower() in normalizar_texto_clinico(les)
-            for term in [normalizar_texto_clinico(zona), normalizar_texto_clinico(coord["grupo"])]
-        )
-        for les in historial_lesiones
-    )
-    if afectado:
-      x_lesion.append(coord["x"])
-      y_lesion.append(coord["y"])
-      text_lesion.append(f"⚠️ Antecedente: {zona}")
-    else:
-      x_sanos.append(coord["x"])
-      y_sanos.append(coord["y"])
-      text_sanos.append(f"Sano: {zona}")
-
-  if x_sanos:
-    fig_body.add_trace(
-        go.Scatter(
-            x=x_sanos,
-            y=y_sanos,
-            mode="markers",
-            marker=dict(size=12, color="#cfd8dc", symbol="circle"),
-            hoverinfo="text",
-            text=text_sanos,
-            showlegend=False,
-        )
-    )
-
-  if x_lesion:
-    fig_body.add_trace(
-        go.Scatter(
-            x=x_lesion,
-            y=y_lesion,
-            mode="markers",
-            marker=dict(size=18, color="#d32f2f", symbol="circle-dot"),
-            hoverinfo="text",
-            text=text_lesion,
-            showlegend=False,
-        )
-    )
-
-  fig_body.update_layout(
-      xaxis=dict(range=[20, 80], showgrid=False, zeroline=False, visible=False),
-      yaxis=dict(range=[0, 100], showgrid=False, zeroline=False, visible=False),
-      margin=dict(t=10, b=10, l=10, r=10),
-      height=180,
-      paper_bgcolor="rgba(0,0,0,0)",
-      plot_bgcolor="rgba(0,0,0,0)",
-  )
-  st.plotly_chart(fig_body, use_container_width=True)
-
-  if historial_lesiones:
-    st.markdown(
-        f"<div style='background-color: #ffebee; padding: 8px; border-radius: 4px; font-size: 12px; color: #c62828; text-align: center;'><b>Antecedente:</b> {', '.join(historial_lesiones)}</div>",
-        unsafe_allow_html=True,
-    )
-  else:
-    st.markdown(
-        "<div style='background-color: #e8f5e9; padding: 8px; border-radius: 4px; font-size: 12px; color: #2e7d32; text-align: center;'><b>Historial clínico limpio</b></div>",
-        unsafe_allow_html=True,
-    )
 
 with col_info:
   st.markdown(
@@ -520,6 +397,83 @@ with col_gps:
       st.metric("Desaceleraciones (dec)", dec)
   else:
     st.warning("Sin datos GPS registrados.")
+
+st.markdown("---")
+
+# --- SECCIÓN NUEVA: GRÁFICO DE EVOLUCIÓN LONGITUDINAL POR PARTIDO ---
+st.markdown("### 📈 Evolución Longitudinal de Carga y Rendimiento por Partido")
+
+if not df_jugador.empty:
+  # Detectar columna de fecha o partido
+  col_fecha_candidatas = [
+      c
+      for c in df_jugador.columns
+      if any(
+          k in str(c).lower() for k in ["fecha", "date", "jornada", "partido"]
+      )
+  ]
+  col_fecha = (
+      col_fecha_candidatas[0] if col_fecha_candidatas else df_jugador.columns[0]
+  )
+
+  # Buscar métricas clave para graficar la evolución temporal (ej: Player Load y HSR o Distancia Total)
+  col_pl_candidatas = [
+      c for c in cols_numericas if any(k in str(c).lower() for k in ["pl", "load"])
+  ]
+  col_hsr_candidatas = [
+      c
+      for c in cols_numericas
+      if any(k in str(c).lower() for k in ["hsr", "high speed", "alta"])
+  ]
+
+  metrica_1 = col_pl_candidatas[0] if col_pl_candidatas else cols_numericas[0]
+  metrica_2 = (
+      col_hsr_candidatas[0]
+      if col_hsr_candidatas
+      else (cols_numericas[1] if len(cols_numericas) > 1 else cols_numericas[0])
+  )
+
+  fig_tendencia = go.Figure()
+
+  fig_tendencia.add_trace(
+      go.Scatter(
+          x=df_jugador[col_fecha],
+          y=df_jugador[metrica_1],
+          mode="lines+markers",
+          name=metrica_1.upper(),
+          line=dict(color="#990000", width=3),
+      )
+  )
+
+  fig_tendencia.add_trace(
+      go.Scatter(
+          x=df_jugador[col_fecha],
+          y=df_jugador[metrica_2],
+          mode="lines+markers",
+          name=metrica_2.upper(),
+          line=dict(color="#2b5c8f", width=3),
+          yaxis="y2",
+      )
+  )
+
+  fig_tendencia.update_layout(
+      title=f"Tendencia Temporal: {metrica_1.upper()} vs {metrica_2.upper()}",
+      xaxis=dict(title="Fecha / Partido"),
+      yaxis=dict(title=metrica_1.upper(), titlefont=dict(color="#990000")),
+      yaxis2=dict(
+          title=metrica_2.upper(),
+          titlefont=dict(color="#2b5c8f"),
+          overlaying="y",
+          side="right",
+      ),
+      legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+      margin=dict(t=40, b=40, l=40, r=40),
+      height=400,
+  )
+
+  st.plotly_chart(fig_tendencia, use_container_width=True)
+else:
+  st.warning("No hay suficientes registros temporales para mostrar la tendencia.")
 
 st.markdown("---")
 with st.expander("📋 Ver Historial Detallado de Registros (Todas las Fechas)"):
