@@ -400,10 +400,10 @@ with col_gps:
 
 st.markdown("---")
 
-# --- SECCIÓN: GRÁFICO DE EVOLUCIÓN LONGITUDINAL POR PARTIDO (CORREGIDO) ---
-st.markdown("### 📈 Evolución Longitudinal de Carga y Rendimiento por Partido")
+# --- SECCIÓN: GRÁFICO DE EVOLUCIÓN LONGITUDINAL INTERACTIVO ---
+st.markdown("### 📈 Evolución Longitudinal por Partido (Selección de Métricas)")
 
-if not df_jugador.empty:
+if not df_jugador.empty and len(cols_numericas) >= 2:
   col_fecha_candidatas = [
       c
       for c in df_jugador.columns
@@ -415,21 +415,30 @@ if not df_jugador.empty:
       col_fecha_candidatas[0] if col_fecha_candidatas else df_jugador.columns[0]
   )
 
-  col_pl_candidatas = [
-      c for c in cols_numericas if any(k in str(c).lower() for k in ["pl", "load"])
-  ]
-  col_hsr_candidatas = [
-      c
-      for c in cols_numericas
-      if any(k in str(c).lower() for k in ["hsr", "high speed", "alta"])
-  ]
+  c_sel1, c_sel2 = st.columns(2)
+  with c_sel1:
+    default_m1_idx = 0
+    for i, c in enumerate(cols_numericas):
+      if any(k in c.lower() for k in ["pl", "load"]):
+        default_m1_idx = i
+        break
+    metrica_1 = st.selectbox(
+        "Selecciona Métrica (Eje Izquierdo 🔴):",
+        cols_numericas,
+        index=default_m1_idx,
+    )
 
-  metrica_1 = col_pl_candidatas[0] if col_pl_candidatas else cols_numericas[0]
-  metrica_2 = (
-      col_hsr_candidatas[0]
-      if col_hsr_candidatas
-      else (cols_numericas[1] if len(cols_numericas) > 1 else cols_numericas[0])
-  )
+  with c_sel2:
+    default_m2_idx = 1 if len(cols_numericas) > 1 else 0
+    for i, c in enumerate(cols_numericas):
+      if any(k in c.lower() for k in ["hsr", "sprint", "dist"]):
+        default_m2_idx = i
+        break
+    metrica_2 = st.selectbox(
+        "Selecciona Métrica (Eje Derecho 🔵):",
+        cols_numericas,
+        index=default_m2_idx,
+    )
 
   fig_tendencia = go.Figure()
 
@@ -438,7 +447,7 @@ if not df_jugador.empty:
           x=df_jugador[col_fecha],
           y=df_jugador[metrica_1],
           mode="lines+markers",
-          name=metrica_1.upper(),
+          name=str(metrica_1).upper(),
           line=dict(color="#990000", width=3),
       )
   )
@@ -448,18 +457,18 @@ if not df_jugador.empty:
           x=df_jugador[col_fecha],
           y=df_jugador[metrica_2],
           mode="lines+markers",
-          name=metrica_2.upper(),
+          name=str(metrica_2).upper(),
           line=dict(color="#2b5c8f", width=3),
           yaxis="y2",
       )
   )
 
   fig_tendencia.update_layout(
-      title=f"Tendencia Temporal: {metrica_1.upper()} vs {metrica_2.upper()}",
+      title=f"Progresión Temporal: {str(metrica_1).upper()} vs {str(metrica_2).upper()}",
       xaxis=dict(title="Fecha / Partido"),
-      yaxis=dict(title=metrica_1.upper(), title_font=dict(color="#990000")),
+      yaxis=dict(title=str(metrica_1).upper(), title_font=dict(color="#990000")),
       yaxis2=dict(
-          title=metrica_2.upper(),
+          title=str(metrica_2).upper(),
           title_font=dict(color="#2b5c8f"),
           overlaying="y",
           side="right",
@@ -471,7 +480,7 @@ if not df_jugador.empty:
 
   st.plotly_chart(fig_tendencia, use_container_width=True)
 else:
-  st.warning("No hay suficientes registros temporales para mostrar la tendencia.")
+  st.warning("No hay suficientes registros numéricos para mostrar la tendencia.")
 
 st.markdown("---")
 with st.expander("📋 Ver Historial Detallado de Registros (Todas las Fechas)"):
