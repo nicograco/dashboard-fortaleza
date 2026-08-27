@@ -70,7 +70,7 @@ jugador_seleccionado = st.sidebar.selectbox(
     "Selecciona el Jugador:", lista_jugadores
 )
 
-# --- FILTRADO 100% ESTRICTO DE DATOS ---
+# --- FILTRADO ESTRICTO DE DATOS ---
 df_jugador = df_raw[df_raw[columna_nombre] == jugador_seleccionado]
 
 
@@ -87,7 +87,7 @@ def limpiar_texto(texto):
   )
 
 
-# --- BÚSQUEDA EXACTA BASADA EN TU ESTRUCTURA DE ARCHIVOS (SIN FOTOS GENÉRICAS) ---
+# --- BÚSQUEDA DE FOTO ADAPTADA ---
 current_dir = os.getcwd()
 ruta_foto = None
 archivo_encontrado = None
@@ -110,34 +110,42 @@ if carpeta_fotos_real:
   ]
 
   nombre_limpio_jugador = limpiar_texto(jugador_seleccionado)
-  tokens_jugador = set(p for p in nombre_limpio_jugador.split() if len(p) > 2)
+  tokens_jugador = [p for p in nombre_limpio_jugador.split() if len(p) >= 3]
 
   mejor_archivo = None
-  max_coincidencias = 0
 
   for archivo in archivos_fotos:
     nombre_sin_ext = os.path.splitext(archivo)[0]
     nombre_limpio_archivo = limpiar_texto(nombre_sin_ext)
-    tokens_archivo = set(
-        p for p in nombre_limpio_archivo.split() if len(p) > 2
-    )
+    tokens_archivo = [p for p in nombre_limpio_archivo.split() if len(p) >= 3]
 
-    # Coincidencia directa de nombre completo o apellido principal (ej: "Cesar-Lucumi.png" -> "cesar" y "lucumi")
-    if (
-        nombre_limpio_archivo == nombre_limpio_jugador
-        or nombre_limpio_archivo in nombre_limpio_jugador
-        or nombre_limpio_jugador in nombre_limpio_archivo
-    ):
+    if nombre_limpio_archivo == nombre_limpio_jugador:
       mejor_archivo = archivo
       break
 
-    if tokens_jugador and tokens_archivo:
-      interseccion = tokens_jugador.intersection(tokens_archivo)
-      if len(interseccion) > max_coincidencias:
-        max_coincidencias = len(interseccion)
-        mejor_archivo = archivo
+    match_encontrado = False
+    for ta in tokens_archivo:
+      for tj in tokens_jugador:
+        if (
+            ta == tj
+            or (
+                len(ta) >= 4
+                and len(tj) >= 4
+                and (ta[:4] == tj[:4] or ta in tj or tj in ta)
+            )
+            or (len(tokens_archivo) == 1 and ta in tj)
+        ):
+          match_encontrado = True
+          break
+      if match_encontrado:
+        break
 
-  if mejor_archivo and max_coincidencias > 0:
+    if match_encontrado:
+      mejor_archivo = archivo
+      if len(tokens_archivo) == 1:
+        break
+
+  if mejor_archivo:
     archivo_encontrado = mejor_archivo
     ruta_foto = os.path.join(carpeta_fotos_real, mejor_archivo)
 
@@ -186,14 +194,13 @@ goles = get_sum(["gol", "goles"])
 asistencias = get_sum(["asist"])
 autogoles = get_sum(["autogol"])
 
-# --- DISEÑO SUPERIOR (FOTO REAL O AVISO LIMPIO + DATOS + ACUMULADO) ---
+# --- DISEÑO SUPERIOR ---
 col_foto, col_info = st.columns([1, 2.3])
 
 with col_foto:
   if ruta_foto and os.path.exists(ruta_foto):
     st.image(ruta_foto, use_container_width=True)
   else:
-    # Espacio visual limpio sin mostrar fotos falsas/genéricas
     st.markdown(
         """
         <div style="border: 2px dashed #ccc; border-radius: 8px; padding: 60px 20px; text-align: center; color: #666; background-color: #fff;">
@@ -213,7 +220,7 @@ with col_foto:
 with col_info:
   st.markdown(
       "### 👤 Datos Personales &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-      " 🏆 Acumulado Temporada"
+      " 🏆 Acumulado Temporada (Suma Total)"
   )
 
   c_dat, c_acu = st.columns(2)
@@ -233,7 +240,7 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR LIMPIO + MÉTRICAS GPS) ---
+# --- DISEÑO INFERIOR ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
