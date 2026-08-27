@@ -10,7 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Estilos CSS idénticos al diseño original
 st.markdown(
     """
     <style>
@@ -57,7 +56,6 @@ except Exception as e:
 st.sidebar.markdown("### ⚙️ Panel de Control")
 st.sidebar.markdown("---")
 
-# Detección de columna de nombres
 col_nombre_candidatas = [
     c
     for c in df_raw.columns
@@ -147,8 +145,6 @@ peso = get_val(["peso"])
 nacimiento = get_val(["nacimiento", "mes"])
 valoracion = get_val(["valoración", "valoracion", "nota"])
 
-total_fechas = len(df_jugador)
-
 
 def get_sum(keywords):
   for col in df_jugador.columns:
@@ -176,16 +172,19 @@ with col_foto:
   )
 
 with col_info:
-  st.markdown("### 👤 Datos Personales &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🏆 Acumulado Temporada")
-  
+  st.markdown(
+      "### 👤 Datos Personales &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🏆 Acumulado"
+      " Temporada"
+  )
+
   c_dat, c_acu = st.columns(2)
-  
+
   with c_dat:
     st.markdown(f"**Posición:** {posicion} &nbsp;|&nbsp; **Depto:** {depto}")
     st.markdown(f"**Talla:** {talla} &nbsp;|&nbsp; **Peso:** {peso}")
     st.markdown(f"**Nacimiento:** {nacimiento}")
     st.markdown(f"**Valoración:** {valoracion}")
-    
+
   with c_acu:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Min. Jugados", min_jugados)
@@ -195,17 +194,35 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR + MÉTRICAS GPS) ---
+# --- DISEÑO INFERIOR (RADAR LIMPIO + MÉTRICAS GPS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
   st.markdown("### 🧬 Perfil Físico y Carga (Promedio)")
-  
-  # Selección de métricas numéricas para el radar estilo araña
-  cols_numericas = df_jugador.select_dtypes(include=["float64", "int64"]).columns.tolist()
+
+  cols_numericas = df_jugador.select_dtypes(
+      include=["float64", "int64"]
+  ).columns.tolist()
+  # Filtramos solo métricas clave para el radar para evitar saturar el gráfico con 50 etiquetas
+  keywords_radar = ["load", "hsr", "dist", "sprint", "acc", "dec", "vel", "min"]
   cols_radar = [
-      c for c in cols_numericas
-      if not any(x in str(c).lower() for x in ["id", "fecha", "partido", "jornada", "año", "talla", "peso", "número", "numero"])
+      c
+      for c in cols_numericas
+      if any(k in str(c).lower() for k in keywords_radar)
+      and not any(
+          x in str(c).lower()
+          for x in [
+              "id",
+              "fecha",
+              "partido",
+              "jornada",
+              "año",
+              "talla",
+              "peso",
+              "número",
+              "numero",
+          ]
+      ]
   ]
 
   if len(cols_radar) >= 3 and not df_jugador.empty:
@@ -225,7 +242,18 @@ with col_radar:
     )
 
     fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, max(100, max(valores_jugador) * 1.1 if valores_jugador else 100)])),
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[
+                    0,
+                    max(
+                        100,
+                        max(valores_jugador) * 1.1 if valores_jugador else 100,
+                    ),
+                ],
+            )
+        ),
         showlegend=False,
         margin=dict(t=20, b=20, l=40, r=40),
         height=380,
@@ -236,9 +264,9 @@ with col_radar:
 
 with col_gps:
   st.markdown("### 🛰️ Métricas de Carga GPS (Promedio por Partido)")
-  
+
   if not df_jugador.empty:
-    # Cálculo de promedios para métricas comunes de GPS
+
     def get_promedio(keywords):
       for col in df_jugador.columns:
         if any(k in str(col).lower() for k in keywords):
@@ -255,7 +283,7 @@ with col_gps:
     sprints = get_promedio(["sprint"])
     min_km = get_promedio(["min/min", "metros/minuto", "m_min"])
     acc = get_promedio(["aceleracion", "acc"])
-    vel_max = get_promedio.get("velocidad", get_promedio(["maxvel", "velocidad"]))
+    vel_max = get_promedio(["maxvel", "velocidad"])  # Error corregido
     dec = get_promedio(["desaceleracion", "dec"])
 
     g1, g2 = st.columns(2)
@@ -263,7 +291,9 @@ with col_gps:
       st.metric("Player Load (PL)", pl)
       st.metric("Distancia Total (TD)", td + " m" if td != "0.0" else "0.0")
       st.metric("Metros / Minuto", min_km)
-      st.metric("Velocidad Máx", vel_max + " km/h" if vel_max != "0.0" else "0.0")
+      st.metric(
+          "Velocidad Máx", vel_max + " km/h" if vel_max != "0.0" else "0.0"
+      )
     with g2:
       st.metric("Alta Intensidad (HSR)", hsr + " m" if hsr != "0.0" else "0.0")
       st.metric("Sprints (>25km/h)", sprints)
