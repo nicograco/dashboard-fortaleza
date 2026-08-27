@@ -65,6 +65,11 @@ columna_nombre = (
     col_nombre_candidatas[0] if col_nombre_candidatas else df_raw.columns[3]
 )
 
+# --- LIMPIEZA Y UNIFICACIÓN DE NOMBRES (EVITA DUPLICADOS POR ESPACIOS O MAYÚSCULAS) ---
+df_raw[columna_nombre] = (
+    df_raw[columna_nombre].astype(str).str.strip().str.title()
+)
+
 lista_jugadores = sorted(df_raw[columna_nombre].dropna().unique())
 jugador_seleccionado = st.sidebar.selectbox(
     "Selecciona el Jugador:", lista_jugadores
@@ -87,7 +92,7 @@ def limpiar_texto(texto):
   )
 
 
-# --- BÚSQUEDA DE FOTO ADAPTADA ---
+# --- BÚSQUEDA DE FOTO INTELIGENTE ---
 current_dir = os.getcwd()
 ruta_foto = None
 archivo_encontrado = None
