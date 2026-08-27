@@ -75,19 +75,23 @@ df_jugador = df_raw[df_raw[columna_nombre] == jugador_seleccionado]
 
 
 def limpiar_texto(texto):
-  return "".join(
-      c
-      for c in unicodedata.normalize("NFD", str(texto))
-      if unicodedata.category(c) != "Mn"
-  ).lower()
+  return (
+      "".join(
+          c
+          for c in unicodedata.normalize("NFD", str(texto))
+          if unicodedata.category(c) != "Mn"
+      )
+      .lower()
+      .replace("-", " ")
+      .replace("_", " ")
+  )
 
 
-# --- BÚSQUEDA INTELIGENTE POR PUNTUACIÓN DE COINCIDENCIA ---
+# --- BÚSQUEDA EXACTA BASADA EN TU ESTRUCTURA DE ARCHIVOS (SIN FOTOS GENÉRICAS) ---
 current_dir = os.getcwd()
 ruta_foto = None
 archivo_encontrado = None
 carpeta_fotos_real = None
-archivos_en_carpeta = []
 
 for root, dirs, files in os.walk(current_dir):
   for d in dirs:
@@ -98,7 +102,7 @@ for root, dirs, files in os.walk(current_dir):
     break
 
 if carpeta_fotos_real:
-  archivos_en_carpeta = [
+  archivos_fotos = [
       f
       for f in os.listdir(carpeta_fotos_real)
       if not f.startswith(".")
@@ -106,36 +110,36 @@ if carpeta_fotos_real:
   ]
 
   nombre_limpio_jugador = limpiar_texto(jugador_seleccionado)
-  tokens_jugador = set(
-      p for p in nombre_limpio_jugador.split() if len(p) > 2
-  )  # Ignora palabras cortas
+  tokens_jugador = set(p for p in nombre_limpio_jugador.split() if len(p) > 2)
 
-  mejor_coincidencia = None
-  max_puntuacion = 0
+  mejor_archivo = None
+  max_coincidencias = 0
 
-  for archivo in archivos_en_carpeta:
+  for archivo in archivos_fotos:
     nombre_sin_ext = os.path.splitext(archivo)[0]
-    tokens_archivo = set(p for p in limpiar_texto(nombre_sin_ext).split() if len(p) > 2)
+    nombre_limpio_archivo = limpiar_texto(nombre_sin_ext)
+    tokens_archivo = set(
+        p for p in nombre_limpio_archivo.split() if len(p) > 2
+    )
 
-    # Calcula cuántas palabras clave coinciden entre el Excel y el nombre del archivo de foto
-    coincidencias = tokens_jugador.intersection(tokens_archivo)
-    puntuacion = len(coincidencias)
+    # Coincidencia directa de nombre completo o apellido principal (ej: "Cesar-Lucumi.png" -> "cesar" y "lucumi")
+    if (
+        nombre_limpio_archivo == nombre_limpio_jugador
+        or nombre_limpio_archivo in nombre_limpio_jugador
+        or nombre_limpio_jugador in nombre_limpio_archivo
+    ):
+      mejor_archivo = archivo
+      break
 
-    # Si hay coincidencia exacta de cadena completa, le damos prioridad máxima
-    if limpiar_texto(nombre_sin_ext) == nombre_limpio_jugador:
-      puntuacion = 100
+    if tokens_jugador and tokens_archivo:
+      interseccion = tokens_jugador.intersection(tokens_archivo)
+      if len(interseccion) > max_coincidencias:
+        max_coincidencias = len(interseccion)
+        mejor_archivo = archivo
 
-    if puntuacion > max_puntuacion:
-      max_puntuacion = puntuacion
-      mejor_coincidencia = archivo
-
-  # Umbral de aceptación: si comparte al menos una palabra clave significativa o puntuación alta
-  if mejor_coincidencia and max_puntuacion > 0:
-    archivo_encontrado = mejor_coincidencia
-    ruta_foto = os.path.join(carpeta_fotos_real, mejor_coincidencia)
-
-if not ruta_foto or not os.path.exists(ruta_foto):
-  ruta_foto = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80"
+  if mejor_archivo and max_coincidencias > 0:
+    archivo_encontrado = mejor_archivo
+    ruta_foto = os.path.join(carpeta_fotos_real, mejor_archivo)
 
 # --- ENCABEZADO PRINCIPAL ---
 st.markdown(
@@ -182,19 +186,29 @@ goles = get_sum(["gol", "goles"])
 asistencias = get_sum(["asist"])
 autogoles = get_sum(["autogol"])
 
-# --- DISEÑO SUPERIOR (FOTO + DATOS PERSONALES + ACUMULADO) ---
+# --- DISEÑO SUPERIOR (FOTO REAL O AVISO LIMPIO + DATOS + ACUMULADO) ---
 col_foto, col_info = st.columns([1, 2.3])
 
 with col_foto:
-  st.image(ruta_foto, use_container_width=True)
+  if ruta_foto and os.path.exists(ruta_foto):
+    st.image(ruta_foto, use_container_width=True)
+  else:
+    # Espacio visual limpio sin mostrar fotos falsas/genéricas
+    st.markdown(
+        """
+        <div style="border: 2px dashed #ccc; border-radius: 8px; padding: 60px 20px; text-align: center; color: #666; background-color: #fff;">
+            <b>Sin fotografía oficial registrada</b>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
   st.markdown(
       f'<div class="player-name">{jugador_seleccionado}</div>',
       unsafe_allow_html=True,
   )
   if archivo_encontrado:
-    st.success(f"✅ Foto vinculada: {archivo_encontrado}")
-  else:
-    st.warning("⚠️ Sin foto asignada (usando genérica).")
+    st.caption(f"📁 Foto oficial: {archivo_encontrado}")
 
 with col_info:
   st.markdown(
@@ -219,7 +233,7 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR + MÉTRICAS GPS) ---
+# --- DISEÑO INFERIOR (RADAR LIMPIO + MÉTRICAS GPS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
@@ -325,14 +339,6 @@ with col_gps:
       st.metric("Desaceleraciones (dec)", dec)
   else:
     st.warning("Sin datos GPS registrados.")
-
-st.markdown("---")
-with st.expander(
-    "🔍 Depuración: Ver archivos detectados en la carpeta FOTOS en GitHub"
-):
-  st.write(f"Carpeta FOTOS encontrada: {carpeta_fotos_real}")
-  st.write(f"Archivos físicos disponibles en GitHub: {archivos_encontrado}")
-  st.write("Listado completo en el repositorio:", archivos_en_carpeta)
 
 st.markdown("---")
 with st.expander("📋 Ver Historial Detallado de Registros (Todas las Fechas)"):
