@@ -73,17 +73,6 @@ jugador_seleccionado = st.sidebar.selectbox(
 # --- FILTRADO 100% ESTRICTO DE DATOS (EVITA MEZCLAR FILAS) ---
 df_jugador = df_raw[df_raw[columna_nombre] == jugador_seleccionado]
 
-# --- BÚSQUEDA INTELIGENTE DE FOTO (EN 3 NIVELES SIN PÉRDIDAS NI CRUCES) ---
-current_dir = os.getcwd()
-contenido_directorio = os.listdir(current_dir)
-
-ruta_foto = None
-carpeta_fotos_real = None
-for d in contenido_directorio:
-  if d.strip().lower() == "fotos":
-    carpeta_fotos_real = os.path.join(current_dir, d)
-    break
-
 
 def limpiar_texto(texto):
   return "".join(
@@ -93,57 +82,57 @@ def limpiar_texto(texto):
   ).lower()
 
 
+# --- BÚSQUEDA INTELIGENTE Y RECURSIVA DE FOTO ---
+current_dir = os.getcwd()
+ruta_foto = None
 archivo_encontrado = None
+carpeta_fotos_real = None
+
+# Localiza la carpeta 'FOTOS' de manera universal (sin importar mayúsculas)
+for root, dirs, files in os.walk(current_dir):
+  for d in dirs:
+    if d.strip().lower() in ["fotos", "photo", "photos"]:
+      carpeta_fotos_real = os.path.join(root, d)
+      break
+  if carpeta_fotos_real:
+    break
+
 if carpeta_fotos_real:
   archivos_fotos = [
-      f for f in os.listdir(carpeta_fotos_real) if not f.startswith(".")
+      f
+      for f in os.listdir(carpeta_fotos_real)
+      if not f.startswith(".")
+      and f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
   ]
   nombre_limpio_jugador = limpiar_texto(jugador_seleccionado)
+  tokens_jugador = [p for p in nombre_limpio_jugador.split() if len(p) > 1]
 
-  # Nivel 1: Coincidencia exacta del nombre completo del archivo con el jugador
+  mejor_coincidencia = None
+
   for archivo in archivos_fotos:
-    nombre_archivo_sin_ext = os.path.splitext(archivo)[0]
-    if limpiar_texto(nombre_archivo_sin_ext) == nombre_limpio_jugador:
-      archivo_encontrado = archivo
+    nombre_sin_ext = os.path.splitext(archivo)[0]
+    nombre_limpio_archivo = limpiar_texto(nombre_sin_ext)
+
+    # 1. Coincidencia exacta
+    if nombre_limpio_archivo == nombre_limpio_jugador:
+      mejor_coincidencia = archivo
       break
 
-  # Nivel 2: Inclusión mutua (el nombre está contenido en el archivo o viceversa)
-  if not archivo_encontrado:
-    for archivo in archivos_fotos:
-      nombre_archivo_sin_ext = os.path.splitext(archivo)[0]
-      nombre_limp_arch = limpiar_texto(nombre_archivo_sin_ext)
-      if (
-          len(nombre_limp_arch) > 3
-          and nombre_limp_arch in nombre_limpio_jugador
-      ) or (
-          len(nombre_limpio_jugador) > 3
-          and nombre_limpio_jugador in nombre_limp_arch
-      ):
-        archivo_encontrado = archivo
-        break
+    # 2. Coincidencia parcial contenida
+    if (
+        nombre_limpio_archivo in nombre_limpio_jugador
+        or nombre_limpio_jugador in nombre_limpio_archivo
+    ):
+      mejor_coincidencia = archivo
 
-  # Nivel 3: Cruce seguro por palabras clave principales (Nombre y Apellido)
-  if not archivo_encontrado:
-    palabras_jugador = [p for p in nombre_limpio_jugador.split() if len(p) > 2]
-    for archivo in archivos_fotos:
-      nombre_archivo_sin_ext = os.path.splitext(archivo)[0]
-      palabras_archivo = [
-          p
-          for p in limpiar_texto(nombre_archivo_sin_ext).split()
-          if len(p) > 2
-      ]
-      if palabras_jugador and palabras_archivo:
-        coincidencias = set(palabras_archivo).intersection(
-            set(palabras_jugador)
-        )
-        if len(coincidencias) >= 2 or (
-            len(palabras_archivo) == 1 and palabras_archivo[0] in palabras_jugador
-        ):
-          archivo_encontrado = archivo
-          break
+    # 3. Coincidencia por palabras clave compartidas
+    tokens_archivo = [p for p in nombre_limpio_archivo.split() if len(p) > 1]
+    if any(t in tokens_archivo for t in tokens_jugador) and not mejor_coincidencia:
+      mejor_coincidencia = archivo
 
-  if archivo_encontrado:
-    ruta_foto = os.path.join(carpeta_fotos_real, archivo_encontrado)
+  if mejor_coincidencia:
+    archivo_encontrado = mejor_coincidencia
+    ruta_foto = os.path.join(carpeta_fotos_real, mejor_coincidencia)
 
 if not ruta_foto or not os.path.exists(ruta_foto):
   ruta_foto = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80"
@@ -159,7 +148,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- EXTRACCIÓN SEGURA DE DATOS PERSONALES Y ACUMULADOS ---
 row_p = df_jugador.iloc[0] if not df_jugador.empty else {}
 
 
@@ -203,11 +191,15 @@ with col_foto:
       f'<div class="player-name">{jugador_seleccionado}</div>',
       unsafe_allow_html=True,
   )
+  if archivo_encontrado:
+    st.caption(f"📁 Foto cargada: {archivo_encontrado}")
+  else:
+    st.caption("⚠️ Sin foto en carpeta FOTOS (usando genérica).")
 
 with col_info:
   st.markdown(
-      "### 👤 Datos Personales &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🏆 Acumulado"
-      " Temporada"
+      "### 👤 Datos Personales &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+      " 🏆 Acumulado Temporada"
   )
 
   c_dat, c_acu = st.columns(2)
@@ -227,7 +219,7 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR LIMPIO + MÉTRICAS GPS) ---
+# --- DISEÑO INFERIOR (RADAR SEGURO + MÉTRICAS GPS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
