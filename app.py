@@ -256,11 +256,13 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR NORMALIZADO 0-100% Y MÉTRICAS GPS) ---
+# --- DISEÑO INFERIOR (RADAR COMPARATIVO: JUGADOR VS PROMEDIO DE SU POSICIÓN) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
-  st.markdown("### 🧬 Perfil Físico y Carga (% del Máximo del Equipo)")
+  st.markdown(
+      f"### 🧬 Perfil Físico: {jugador_seleccionado} vs Promedio ({posicion})"
+  )
 
   cols_numericas = df_jugador.select_dtypes(
       include=["float64", "int64"]
@@ -283,24 +285,60 @@ with col_radar:
       cols_radar.append(c)
 
   if len(cols_radar) >= 3 and not df_jugador.empty:
+    # Identificamos la columna de posición en el DataFrame para agrupar
+    col_pos_candidatas = [
+        c
+        for c in df_raw.columns
+        if any(k in str(c).lower() for k in ["pos", "posición", "position"])
+    ]
+    col_pos = (
+        col_pos_candidatas[0] if col_pos_candidatas else df_raw.columns[2]
+    )
+
+    # Filtramos a todos los jugadores que comparten la misma posición (ej: MCO)
+    df_misma_posicion = df_raw[df_raw[col_pos] == posicion]
+
     promedios_jugador = df_jugador[cols_radar].mean()
-    valores_normalizados = []
+    promedios_posicion = df_misma_posicion[cols_radar].mean()
+
+    valores_jugador_norm = []
+    valores_posicion_norm = []
     categorias = []
 
     for c in cols_radar:
-      max_equipo = df_raw[c].max()
-      val_jug = promedios_jugador[c]
+      max_equipo = df_raw[c].max()  # Techo máximo global del equipo
+      val_jug = promedios_jugador[c] if pd.notna(promedios_jugador[c]) else 0
+      val_pos = (
+          promedios_posicion[c] if pd.notna(promedios_posicion[c]) else 0
+      )
+
       if max_equipo > 0:
-        norm = (val_jug / max_equipo) * 100
-        valores_normalizados.append(min(norm, 100))
+        valores_jugador_norm.append(min((val_jug / max_equipo) * 100, 100))
+        valores_posicion_norm.append(min((val_pos / max_equipo) * 100, 100))
       else:
-        valores_normalizados.append(0)
+        valores_jugador_norm.append(0)
+        valores_posicion_norm.append(0)
+
       categorias.append(c.upper())
 
     fig = go.Figure()
+
+    # Trazado 1: Promedio de la Posición (Referencia Táctica)
     fig.add_trace(
         go.Scatterpolar(
-            r=valores_normalizados,
+            r=valores_posicion_norm,
+            theta=categorias,
+            fill="toself",
+            name=f"Promedio Posición ({posicion})",
+            line_color="#2b5c8f",
+            fillcolor="rgba(43, 92, 143, 0.2)",
+        )
+    )
+
+    # Trazado 2: Rendimiento del Jugador Seleccionado
+    fig.add_trace(
+        go.Scatterpolar(
+            r=valores_jugador_norm,
             theta=categorias,
             fill="toself",
             name=jugador_seleccionado,
@@ -313,8 +351,11 @@ with col_radar:
         polar=dict(
             radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")
         ),
-        showlegend=False,
-        margin=dict(t=20, b=20, l=40, r=40),
+        showlegend=True,
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1
+        ),
+        margin=dict(t=40, b=20, l=40, r=40),
         height=380,
     )
     st.plotly_chart(fig, use_container_width=True)
