@@ -400,11 +400,10 @@ with col_gps:
 
 st.markdown("---")
 
-# --- SECCIÓN NUEVA: GRÁFICO DE EVOLUCIÓN LONGITUDINAL POR PARTIDO ---
+# --- SECCIÓN: GRÁFICO DE EVOLUCIÓN LONGITUDINAL POR PARTIDO (CORREGIDO) ---
 st.markdown("### 📈 Evolución Longitudinal de Carga y Rendimiento por Partido")
 
 if not df_jugador.empty:
-  # Detectar columna de fecha o partido
   col_fecha_candidatas = [
       c
       for c in df_jugador.columns
@@ -416,7 +415,6 @@ if not df_jugador.empty:
       col_fecha_candidatas[0] if col_fecha_candidatas else df_jugador.columns[0]
   )
 
-  # Buscar métricas clave para graficar la evolución temporal (ej: Player Load y HSR o Distancia Total)
   col_pl_candidatas = [
       c for c in cols_numericas if any(k in str(c).lower() for k in ["pl", "load"])
   ]
@@ -459,10 +457,10 @@ if not df_jugador.empty:
   fig_tendencia.update_layout(
       title=f"Tendencia Temporal: {metrica_1.upper()} vs {metrica_2.upper()}",
       xaxis=dict(title="Fecha / Partido"),
-      yaxis=dict(title=metrica_1.upper(), titlefont=dict(color="#990000")),
+      yaxis=dict(title=metrica_1.upper(), title_font=dict(color="#990000")),
       yaxis2=dict(
           title=metrica_2.upper(),
-          titlefont=dict(color="#2b5c8f"),
+          title_font=dict(color="#2b5c8f"),
           overlaying="y",
           side="right",
       ),
