@@ -42,9 +42,19 @@ st.markdown(
 @st.cache_data
 def cargar_datos():
   try:
-    return pd.read_excel("DATOS INDIVIDUALES.xlsx", sheet_name="individual")
+    df = pd.read_excel("DATOS INDIVIDUALES.xlsx", sheet_name="individual")
   except:
-    return pd.read_excel("DATOS INDIVIDUALES.xlsx", sheet_name=0)
+    df = pd.read_excel("DATOS INDIVIDUALES.xlsx", sheet_name=0)
+
+  # Forzar conversión numérica en todas las columnas excepto el nombre y fechas
+  for col in df.columns:
+    if any(
+        k in str(col).lower()
+        for k in ["nombre", "jug", "player", "fecha", "date", "pos", "depto"]
+    ):
+      continue
+    df[col] = pd.to_numeric(df[col], errors="coerce")
+  return df
 
 
 try:
@@ -400,8 +410,8 @@ with col_gps:
 
 st.markdown("---")
 
-# --- SECCIÓN: GRÁFICO DE EVOLUCIÓN LONGITUDINAL + ANÁLISIS AUTOMATIZADO ---
-st.markdown("### 📈 Evolución Longitudinal y Análisis de Rendimiento")
+# --- SECCIÓN: GRÁFICO DE EVOLUCIÓN LONGITUDINAL INTERACTIVO + ANÁLISIS ---
+st.markdown("### 📈 Evolución Longitudinal por Partido (Selección de Métricas)")
 
 if not df_jugador.empty and len(cols_numericas) >= 2:
   col_fecha_candidatas = [
@@ -482,7 +492,7 @@ if not df_jugador.empty and len(cols_numericas) >= 2:
 
   st.plotly_chart(fig_tendencia, use_container_width=True)
 
-  # --- APARTADO DE ANÁLISIS AUTOMATIZADO Y SINTETIZADO ---
+  # --- ANÁLISIS AUTOMATIZADO ---
   try:
     val_max_1 = df_jugador_ordenado[metrica_1].max()
     prom_1 = df_jugador_ordenado[metrica_1].mean()
