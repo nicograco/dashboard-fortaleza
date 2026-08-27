@@ -48,7 +48,6 @@ except Exception as e:
 st.sidebar.markdown("### ⚙️ Panel de Control")
 st.sidebar.markdown("---")
 
-# Detección precisa de la columna de nombres
 col_nombre_candidatas = [
     c
     for c in df_raw.columns
@@ -134,24 +133,20 @@ with col2:
   st.markdown("### **📊 Perfil de Rendimiento y Métricas**")
 
   if not df_jugador.empty:
-    # Seleccionar columnas numéricas para el gráfico de radar / spider chart
     cols_numericas = df_jugador.select_dtypes(
         include=["float64", "int64"]
     ).columns.tolist()
 
-    # Filtrar columnas que no sirven para el radar (como ID o fechas si están en formato numérico extraño)
+    # CORRECCIÓN DE LA COMA INVALIDA AQUÍ:
     cols_radar = [
         c
         for c in cols_numericas
         if not any(
-            x in str(c).lower() for x in, ["id", "fecha", "partido", "jornada"]
+            x in str(c).lower() for x in ["id", "fecha", "partido", "jornada"]
         )
     ]
 
-    if (
-        len(cols_radar) >= 3
-    ):  # Se necesitan al menos 3 métricas para armar un buen radar
-      # Calculamos un promedio o tomamos los valores del jugador seleccionado
+    if len(cols_radar) >= 3:
       valores_jugador = df_jugador[cols_radar].mean().tolist()
       categorias = cols_radar
 
