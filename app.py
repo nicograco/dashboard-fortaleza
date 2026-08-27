@@ -66,7 +66,7 @@ columna_nombre = (
 )
 
 
-# --- UNIFICACIÓN BLINDADA DE NOMBRES (ELIMINA DUPLICADOS DE ADRIÁN) ---
+# --- UNIFICACIÓN BLINDADA DE NOMBRES (ELIMINA DUPLICADOS) ---
 def armonizar_nombres(nombre):
   n = str(nombre).strip().title()
   n_norm = "".join(
@@ -74,7 +74,6 @@ def armonizar_nombres(nombre):
       for c in unicodedata.normalize("NFD", n)
       if unicodedata.category(c) != "Mn"
   ).lower()
-  # Fusiona cualquier variante de Adrián Mosquera en una sola
   if "adrian mosquera" in n_norm:
     return "Adrian Mosquera Renteria"
   return n
@@ -257,17 +256,15 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR EXCLUSIVO CON LAS 8 MÉTRICAS SOLICITADAS) ---
+# --- DISEÑO INFERIOR (RADAR NORMALIZADO 0-100% Y MÉTRICAS GPS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
-  st.markdown("### 🧬 Perfil Físico y Carga (Promedio)")
+  st.markdown("### 🧬 Perfil Físico y Carga (% del Máximo del Equipo)")
 
   cols_numericas = df_jugador.select_dtypes(
       include=["float64", "int64"]
   ).columns.tolist()
-
-  # Lista estricta basada exclusivamente en tus métricas requeridas: pl, td, m_min, hsr, sprint25, acc, dec, maxvel
   metricas_objetivo = [
       "pl",
       "td",
@@ -282,18 +279,28 @@ with col_radar:
 
   for c in cols_numericas:
     c_lower = str(c).lower()
-    # Verifica si la columna coincide con alguna de las exactas solicitadas
     if any(m in c_lower for m in metricas_objetivo):
       cols_radar.append(c)
 
   if len(cols_radar) >= 3 and not df_jugador.empty:
-    valores_jugador = df_jugador[cols_radar].mean().tolist()
-    categorias = cols_radar
+    promedios_jugador = df_jugador[cols_radar].mean()
+    valores_normalizados = []
+    categorias = []
+
+    for c in cols_radar:
+      max_equipo = df_raw[c].max()
+      val_jug = promedios_jugador[c]
+      if max_equipo > 0:
+        norm = (val_jug / max_equipo) * 100
+        valores_normalizados.append(min(norm, 100))
+      else:
+        valores_normalizados.append(0)
+      categorias.append(c.upper())
 
     fig = go.Figure()
     fig.add_trace(
         go.Scatterpolar(
-            r=valores_jugador,
+            r=valores_normalizados,
             theta=categorias,
             fill="toself",
             name=jugador_seleccionado,
@@ -304,16 +311,7 @@ with col_radar:
 
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[
-                    0,
-                    max(
-                        100,
-                        max(valores_jugador) * 1.1 if valores_jugador else 100,
-                    ),
-                ],
-            )
+            radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")
         ),
         showlegend=False,
         margin=dict(t=20, b=20, l=40, r=40),
