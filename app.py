@@ -97,7 +97,6 @@ if carpeta_fotos_real:
 
   for archivo in archivos_fotos:
     archivo_limpio = limpiar_texto(archivo)
-    # Exige que todas las partes significativas del nombre coincidan estrictamente
     if partes_nombre and all(
         parte in archivo_limpio for parte in partes_nombre
     ):
@@ -110,7 +109,7 @@ if carpeta_fotos_real:
 if not ruta_foto or not os.path.exists(ruta_foto):
   ruta_foto = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80"
 
-# --- INTERFAZ VISUAL ---
+# --- INTERFAZ VISUAL PRINCIPAL ---
 st.markdown(
     f"""
     <div class="header-box">
@@ -128,10 +127,61 @@ with col1:
   st.markdown(f"### **{jugador_seleccionado}**")
   if not archivo_encontrado:
     st.info("Sin fotografía oficial registrada.")
+  else:
+    st.success("Fotografía sincronizada.")
 
 with col2:
-  st.markdown("### **Resumen de Métricas del Jugador**")
+  st.markdown("### **📊 Perfil de Rendimiento y Métricas**")
+
   if not df_jugador.empty:
+    # Seleccionar columnas numéricas para el gráfico de radar / spider chart
+    cols_numericas = df_jugador.select_dtypes(
+        include=["float64", "int64"]
+    ).columns.tolist()
+
+    # Filtrar columnas que no sirven para el radar (como ID o fechas si están en formato numérico extraño)
+    cols_radar = [
+        c
+        for c in cols_numericas
+        if not any(
+            x in str(c).lower() for x in, ["id", "fecha", "partido", "jornada"]
+        )
+    ]
+
+    if (
+        len(cols_radar) >= 3
+    ):  # Se necesitan al menos 3 métricas para armar un buen radar
+      # Calculamos un promedio o tomamos los valores del jugador seleccionado
+      valores_jugador = df_jugador[cols_radar].mean().tolist()
+      categorias = cols_radar
+
+      fig = go.Figure()
+      fig.add_trace(
+          go.Scatterpolar(
+              r=valores_jugador,
+              theta=categorias,
+              fill="toself",
+              name=jugador_seleccionado,
+              line_color="#B22222",
+              fillcolor="rgba(178, 34, 34, 0.4)",
+          )
+      )
+
+      fig.update_layout(
+          polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+          showlegend=False,
+          margin=dict(t=30, b=30, l=30, r=30),
+          height=350,
+      )
+
+      st.plotly_chart(fig, use_container_width=True)
+    else:
+      st.info(
+          "Se muestran las métricas detalladas en tabla (métricas numéricas"
+          " insuficientes para radar automático)."
+      )
+
+    st.markdown("#### **Historial de Registros Individuales**")
     st.dataframe(df_jugador, use_container_width=True)
   else:
     st.warning("No hay registros disponibles para este jugador.")
