@@ -38,6 +38,39 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ==========================================
+# 🩺 PASAPORTE CLÍNICO E HISTORIAL DE LESIVIDAD
+# ==========================================
+REGISTRO_HISTORIAL_LESIONES = {
+    "Sebastian Herrera": ["Isquiotibial Derecho"],
+    "Cesar Lucumi": ["Aductor Derecho"],
+    "Jhon Tarazona": ["Esguince Rodilla Derecha"],
+    "Jofren Santiago": ["Isquiotibial Izquierdo"],
+    "Juan Jose Carreño": ["Tendinopatía Rodilla"],
+    "Armando Larranz": ["Isquiotibial Derecho", "Isquiotibial Izquierdo"],
+    "Nicolas Suarez": ["Isquiotibial Derecho"],
+    "Samuel Osorio": ["Tobillos (Esguinces recurrentes)"],
+}
+
+# Coordenadas anatómicas ampliadas para el "muñequito" corporal (Plano X, Y)
+MAPA_ANATOMICO_COORDS = {
+    "Cabeza": {"x": 50, "y": 90, "grupo": "Superior"},
+    "Hombro Der": {"x": 35, "y": 75, "grupo": "Tren Superior"},
+    "Hombro Izq": {"x": 65, "y": 75, "grupo": "Tren Superior"},
+    "Aductor Der": {"x": 46, "y": 52, "grupo": "Aductor"},
+    "Aductor Izq": {"x": 54, "y": 52, "grupo": "Aductor"},
+    "Cuádriceps Der": {"x": 42, "y": 45, "grupo": "Cuádriceps"},
+    "Cuádriceps Izq": {"x": 58, "y": 45, "grupo": "Cuádriceps"},
+    "Rodilla Der": {"x": 42, "y": 58, "grupo": "Rodilla"},
+    "Rodilla Izq": {"x": 58, "y": 58, "grupo": "Rodilla"},
+    "Isquiotibial Der": {"x": 42, "y": 30, "grupo": "Isquiotibial"},
+    "Isquiotibial Izq": {"x": 58, "y": 30, "grupo": "Isquiotibial"},
+    "Gemelo Der": {"x": 42, "y": 15, "grupo": "Gemelo"},
+    "Gemelo Izq": {"x": 58, "y": 15, "grupo": "Gemelo"},
+    "Tobillo Der": {"x": 42, "y": 5, "grupo": "Tobillo"},
+    "Tobillo Izq": {"x": 58, "y": 5, "grupo": "Tobillo"},
+}
+
 
 @st.cache_data
 def cargar_datos():
@@ -210,7 +243,7 @@ goles = get_sum(["gol", "goles"])
 asistencias = get_sum(["asist"])
 autogoles = get_sum(["autogol"])
 
-# --- DISEÑO SUPERIOR ---
+# --- DISEÑO SUPERIOR (FOTO + DATOS + MUÑEQUITO CLÍNICO) ---
 col_foto, col_info = st.columns([1, 2.3])
 
 with col_foto:
@@ -219,7 +252,7 @@ with col_foto:
   else:
     st.markdown(
         """
-        <div style="border: 2px dashed #ccc; border-radius: 8px; padding: 60px 20px; text-align: center; color: #666; background-color: #fff;">
+        <div style="border: 2px dashed #ccc; border-radius: 8px; padding: 40px 20px; text-align: center; color: #666; background-color: #fff;">
             <b>Sin fotografía oficial registrada</b>
         </div>
         """,
@@ -232,6 +265,78 @@ with col_foto:
   )
   if archivo_encontrado:
     st.caption(f"📁 Foto oficial: {archivo_encontrado}")
+
+  # --- GENERACIÓN DEL "MUÑEQUITO" / MAPA ANATÓMICO CLÍNICO ---
+  st.markdown("##### 🩺 Mapa de Lesividad (Historial)")
+  historial_lesiones = REGISTRO_HISTORIAL_LESIONES.get(jugador_seleccionado, [])
+
+  fig_body = go.Figure()
+  x_sanos, y_sanos, text_sanos = [], [], []
+  x_lesion, y_lesion, text_lesion = [], [], []
+
+  for zona, coord in MAPA_ANATOMICO_COORDS.items():
+    afectado = any(
+        any(
+            term.lower() in les.lower()
+            for term in [zona.lower(), coord["grupo"].lower()]
+        )
+        for les in historial_lesiones
+    )
+    if afectado:
+      x_lesion.append(coord["x"])
+      y_lesion.append(coord["y"])
+      text_lesion.append(f"⚠️ Antecedente: {zona}")
+    else:
+      x_sanos.append(coord["x"])
+      y_sanos.append(coord["y"])
+      text_sanos.append(f"Sano: {zona}")
+
+  if x_sanos:
+    fig_body.add_trace(
+        go.Scatter(
+            x=x_sanos,
+            y=y_sanos,
+            mode="markers",
+            marker=dict(size=12, color="#cfd8dc", symbol="circle"),
+            hoverinfo="text",
+            text=text_sanos,
+            showlegend=False,
+        )
+    )
+
+  if x_lesion:
+    fig_body.add_trace(
+        go.Scatter(
+            x=x_lesion,
+            y=y_lesion,
+            mode="markers",
+            marker=dict(size=18, color="#d32f2f", symbol="circle-dot"),
+            hoverinfo="text",
+            text=text_lesion,
+            showlegend=False,
+        )
+    )
+
+  fig_body.update_layout(
+      xaxis=dict(range=[20, 80], showgrid=False, zeroline=False, visible=False),
+      yaxis=dict(range=[0, 100], showgrid=False, zeroline=False, visible=False),
+      margin=dict(t=10, b=10, l=10, r=10),
+      height=180,
+      paper_bgcolor="rgba(0,0,0,0)",
+      plot_bgcolor="rgba(0,0,0,0)",
+  )
+  st.plotly_chart(fig_body, use_container_width=True)
+
+  if historial_lesiones:
+    st.markdown(
+        f"<div style='background-color: #ffebee; padding: 8px; border-radius: 4px; font-size: 12px; color: #c62828; text-align: center;'><b>Antecedente:</b> {', '.join(historial_lesiones)}</div>",
+        unsafe_allow_html=True,
+    )
+  else:
+    st.markdown(
+        "<div style='background-color: #e8f5e9; padding: 8px; border-radius: 4px; font-size: 12px; color: #2e7d32; text-align: center;'><b>Historial clínico limpio</b></div>",
+        unsafe_allow_html=True,
+    )
 
 with col_info:
   st.markdown(
@@ -256,7 +361,7 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR COMPARATIVO: JUGADOR VS PROMEDIO DE SU POSICIÓN) ---
+# --- DISEÑO INFERIOR (RADAR COMPARATIVO VS POSICIÓN Y MÉTRICAS GPS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
@@ -285,7 +390,6 @@ with col_radar:
       cols_radar.append(c)
 
   if len(cols_radar) >= 3 and not df_jugador.empty:
-    # Identificamos la columna de posición en el DataFrame para agrupar
     col_pos_candidatas = [
         c
         for c in df_raw.columns
@@ -295,7 +399,6 @@ with col_radar:
         col_pos_candidatas[0] if col_pos_candidatas else df_raw.columns[2]
     )
 
-    # Filtramos a todos los jugadores que comparten la misma posición (ej: MCO)
     df_misma_posicion = df_raw[df_raw[col_pos] == posicion]
 
     promedios_jugador = df_jugador[cols_radar].mean()
@@ -306,7 +409,7 @@ with col_radar:
     categorias = []
 
     for c in cols_radar:
-      max_equipo = df_raw[c].max()  # Techo máximo global del equipo
+      max_equipo = df_raw[c].max()
       val_jug = promedios_jugador[c] if pd.notna(promedios_jugador[c]) else 0
       val_pos = (
           promedios_posicion[c] if pd.notna(promedios_posicion[c]) else 0
@@ -323,7 +426,6 @@ with col_radar:
 
     fig = go.Figure()
 
-    # Trazado 1: Promedio de la Posición (Referencia Táctica)
     fig.add_trace(
         go.Scatterpolar(
             r=valores_posicion_norm,
@@ -335,7 +437,6 @@ with col_radar:
         )
     )
 
-    # Trazado 2: Rendimiento del Jugador Seleccionado
     fig.add_trace(
         go.Scatterpolar(
             r=valores_jugador_norm,
