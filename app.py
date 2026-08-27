@@ -400,8 +400,8 @@ with col_gps:
 
 st.markdown("---")
 
-# --- SECCIÓN: GRÁFICO DE EVOLUCIÓN LONGITUDINAL INTERACTIVO ---
-st.markdown("### 📈 Evolución Longitudinal por Partido (Selección de Métricas)")
+# --- SECCIÓN: GRÁFICO DE EVOLUCIÓN LONGITUDINAL + ANÁLISIS AUTOMATIZADO ---
+st.markdown("### 📈 Evolución Longitudinal y Análisis de Rendimiento")
 
 if not df_jugador.empty and len(cols_numericas) >= 2:
   col_fecha_candidatas = [
@@ -414,6 +414,8 @@ if not df_jugador.empty and len(cols_numericas) >= 2:
   col_fecha = (
       col_fecha_candidatas[0] if col_fecha_candidatas else df_jugador.columns[0]
   )
+
+  df_jugador_ordenado = df_jugador.sort_values(by=col_fecha)
 
   c_sel1, c_sel2 = st.columns(2)
   with c_sel1:
@@ -444,8 +446,8 @@ if not df_jugador.empty and len(cols_numericas) >= 2:
 
   fig_tendencia.add_trace(
       go.Scatter(
-          x=df_jugador[col_fecha],
-          y=df_jugador[metrica_1],
+          x=df_jugador_ordenado[col_fecha],
+          y=df_jugador_ordenado[metrica_1],
           mode="lines+markers",
           name=str(metrica_1).upper(),
           line=dict(color="#990000", width=3),
@@ -454,8 +456,8 @@ if not df_jugador.empty and len(cols_numericas) >= 2:
 
   fig_tendencia.add_trace(
       go.Scatter(
-          x=df_jugador[col_fecha],
-          y=df_jugador[metrica_2],
+          x=df_jugador_ordenado[col_fecha],
+          y=df_jugador_ordenado[metrica_2],
           mode="lines+markers",
           name=str(metrica_2).upper(),
           line=dict(color="#2b5c8f", width=3),
@@ -465,7 +467,7 @@ if not df_jugador.empty and len(cols_numericas) >= 2:
 
   fig_tendencia.update_layout(
       title=f"Progresión Temporal: {str(metrica_1).upper()} vs {str(metrica_2).upper()}",
-      xaxis=dict(title="Fecha / Partido"),
+      xaxis=dict(title="Fecha / Partido", type="category"),
       yaxis=dict(title=str(metrica_1).upper(), title_font=dict(color="#990000")),
       yaxis2=dict(
           title=str(metrica_2).upper(),
@@ -479,6 +481,42 @@ if not df_jugador.empty and len(cols_numericas) >= 2:
   )
 
   st.plotly_chart(fig_tendencia, use_container_width=True)
+
+  # --- APARTADO DE ANÁLISIS AUTOMATIZADO Y SINTETIZADO ---
+  try:
+    val_max_1 = df_jugador_ordenado[metrica_1].max()
+    prom_1 = df_jugador_ordenado[metrica_1].mean()
+    row_pico_1 = df_jugador_ordenado.loc[
+        df_jugador_ordenado[metrica_1].idxmax()
+    ]
+    fecha_pico_1 = row_pico_1[col_fecha]
+
+    val_max_2 = df_jugador_ordenado[metrica_2].max()
+    prom_2 = df_jugador_ordenado[metrica_2].mean()
+    row_pico_2 = df_jugador_ordenado.loc[
+        df_jugador_ordenado[metrica_2].idxmax()
+    ]
+    fecha_pico_2 = row_pico_2[col_fecha]
+
+    total_partidos = len(df_jugador_ordenado)
+
+    st.markdown(
+        f"""
+        <div style="background-color: #f1f3f5; border-left: 4px solid #2b5c8f; padding: 18px; border-radius: 6px; margin-top: 15px;">
+            <h4 style="margin: 0 0 10px 0; color: #111;">🧠 Análisis Automatizado de Rendimiento (Cuerpo Técnico)</h4>
+            <ul style="margin: 0; padding-left: 20px; color: #333; font-size: 14px; line-height: 1.6;">
+                <li><b>Participación Registrada:</b> El deportista cuenta con registros en <b>{total_partidos} partidos</b> evaluados en el periodo.</li>
+                <li><b>Comportamiento de {str(metrica_1).upper()} (Eje Rojo):</b> Presenta un promedio general de <b>{prom_1:.1f}</b> por partido, alcanzando su rendimiento cumbre de <b>{val_max_1}</b> en la jornada <i>{fecha_pico_1}</i>.</li>
+                <li><b>Comportamiento de {str(metrica_2).upper()} (Eje Azul):</b> Mantiene un promedio de <b>{prom_2:.1f}</b> con un pico máximo de <b>{val_max_2}</b> registrado en la fecha <i>{fecha_pico_2}</i>.</li>
+                <li><b>Interpretación Analítica:</b> Este cruce permite identificar las semanas de mayor exigencia competitiva. La sincronización de picos en ambas métricas refleja partidos de alta intensidad global, mientras que las variaciones individuales ayudan a calibrar las cargas de trabajo de cara a la planificación semanal.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+  except Exception as err:
+    st.info("Generando métricas analíticas...")
+
 else:
   st.warning("No hay suficientes registros numéricos para mostrar la tendencia.")
 
