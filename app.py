@@ -194,7 +194,7 @@ with col_info:
 
 st.markdown("---")
 
-# --- DISEÑO INFERIOR (RADAR LIMPIO + MÉTRICAS GPS) ---
+# --- DISEÑO INFERIOR (RADAR SEGURO + MÉTRICAS GPS) ---
 col_radar, col_gps = st.columns([1, 1.2])
 
 with col_radar:
@@ -203,27 +203,26 @@ with col_radar:
   cols_numericas = df_jugador.select_dtypes(
       include=["float64", "int64"]
   ).columns.tolist()
-  # Filtramos solo métricas clave para el radar para evitar saturar el gráfico con 50 etiquetas
   keywords_radar = ["load", "hsr", "dist", "sprint", "acc", "dec", "vel", "min"]
-  cols_radar = [
-      c
-      for c in cols_numericas
-      if any(k in str(c).lower() for k in keywords_radar)
-      and not any(
-          x in str(c).lower()
-          for x in [
-              "id",
-              "fecha",
-              "partido",
-              "jornada",
-              "año",
-              "talla",
-              "peso",
-              "número",
-              "numero",
-          ]
-      ]
+  exclusiones = [
+      "id",
+      "fecha",
+      "partido",
+      "jornada",
+      "año",
+      "talla",
+      "peso",
+      "número",
+      "numero",
   ]
+
+  cols_radar = []
+  for c in cols_numericas:
+    c_lower = str(c).lower()
+    es_valida = any(k in c_lower for k in keywords_radar)
+    es_excluida = any(e in c_lower for e in exclusiones)
+    if es_valida and not es_excluida:
+      cols_radar.append(c)
 
   if len(cols_radar) >= 3 and not df_jugador.empty:
     valores_jugador = df_jugador[cols_radar].mean().tolist()
@@ -283,7 +282,7 @@ with col_gps:
     sprints = get_promedio(["sprint"])
     min_km = get_promedio(["min/min", "metros/minuto", "m_min"])
     acc = get_promedio(["aceleracion", "acc"])
-    vel_max = get_promedio(["maxvel", "velocidad"])  # Error corregido
+    vel_max = get_promedio(["maxvel", "velocidad"])
     dec = get_promedio(["desaceleracion", "dec"])
 
     g1, g2 = st.columns(2)
