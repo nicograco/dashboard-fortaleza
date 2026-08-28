@@ -113,21 +113,13 @@ def limpiar_texto(texto):
   )
 
 
-# --- BÚSQUEDA DE FOTO ---
+# --- BÚSQUEDA DE FOTO EN LA CARPETA FOTOS ---
 current_dir = os.getcwd()
 ruta_foto = None
 archivo_encontrado = None
-carpeta_fotos_real = None
+carpeta_fotos_real = os.path.join(current_dir, "FOTOS")
 
-for root, dirs, files in os.walk(current_dir):
-  for d in dirs:
-    if d.strip().lower() in ["fotos", "photo", "photos"]:
-      carpeta_fotos_real = os.path.join(root, d)
-      break
-  if carpeta_fotos_real:
-    break
-
-if carpeta_fotos_real:
+if os.path.exists(carpeta_fotos_real):
   archivos_fotos = [
       f
       for f in os.listdir(carpeta_fotos_real)
@@ -135,40 +127,24 @@ if carpeta_fotos_real:
       and f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
   ]
 
-  nombre_limpio_jugador = limpiar_texto(jugador_seleccionado)
-  tokens_jugador = [p for p in nombre_limpio_jugador.split() if len(p) >= 3]
+  tokens_jugador = [
+      t for t in limpiar_texto(jugador_seleccionado).split() if len(t) >= 3
+  ]
+  apellido_jugador = tokens_jugador[-1] if tokens_jugador else ""
 
   mejor_archivo = None
 
   for archivo in archivos_fotos:
-    nombre_sin_ext = os.path.splitext(archivo)[0]
-    nombre_limpio_archivo = limpiar_texto(nombre_sin_ext)
-    tokens_archivo = [p for p in nombre_limpio_archivo.split() if len(p) >= 3]
-
-    if nombre_limpio_archivo == nombre_limpio_jugador:
+    nombre_sin_ext = os.path.splitext(archivo)[0].lower()
+    if nombre_sin_ext == apellido_jugador:
       mejor_archivo = archivo
       break
 
-    match_encontrado = False
-    for ta in tokens_archivo:
-      for tj in tokens_jugador:
-        if (
-            ta == tj
-            or (
-                len(ta) >= 4
-                and len(tj) >= 4
-                and (ta[:4] == tj[:4] or ta in tj or tj in ta)
-            )
-            or (len(tokens_archivo) == 1 and ta in tj)
-        ):
-          match_encontrado = True
-          break
-      if match_encontrado:
-        break
-
-    if match_encontrado:
-      mejor_archivo = archivo
-      if len(tokens_archivo) == 1:
+  if not mejor_archivo:
+    for archivo in archivos_fotos:
+      nombre_sin_ext = os.path.splitext(archivo)[0].lower()
+      if any(token == nombre_sin_ext for token in tokens_jugador):
+        mejor_archivo = archivo
         break
 
   if mejor_archivo:
